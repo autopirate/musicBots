@@ -25,6 +25,10 @@ class attitudeControl
             this->thrust+=0.1;
         else if (key->code==274)
             this->thrust-=0.1;
+        else if (key->code==27)
+            this->arm=false;
+        else if (key->code==97)
+            this->arm=true;
         
     }
 
@@ -32,8 +36,11 @@ class attitudeControl
     {
         return thrust;
     }
+
+    bool arm;
     private:
         double thrust;
+        
 
 };
 
@@ -80,8 +87,9 @@ int main(int argc, char **argv)
     mavros_msgs::SetMode offb_set_mode;
     offb_set_mode.request.custom_mode = "OFFBOARD";
 
-    mavros_msgs::CommandBool arm_cmd;
+    mavros_msgs::CommandBool arm_cmd, disarm_cmd;
     arm_cmd.request.value = true;
+    disarm_cmd.request.value = false;
 
     ros::Time last_request = ros::Time::now();
 
@@ -94,8 +102,18 @@ int main(int argc, char **argv)
                 ROS_INFO("Offboard enabled");
             }
             last_request = ros::Time::now();
-        } else {
-            if( !current_state.armed &&
+        } 
+
+        else if (current_state.armed && !attSet.arm && (ros::Time::now() - last_request > ros::Duration(5.0)))
+        {
+            if( arming_client.call(disarm_cmd) &&
+                    disarm_cmd.response.success){
+                    ROS_INFO("Vehicle disarmed");
+                }
+        }
+
+        else {
+            if( !current_state.armed && attSet.arm && 
                 (ros::Time::now() - last_request > ros::Duration(5.0))){
                 if( arming_client.call(arm_cmd) &&
                     arm_cmd.response.success){
