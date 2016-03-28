@@ -6,6 +6,8 @@
 #include <mavros_msgs/State.h>
 #include <mavros_msgs/AttitudeTarget.h>
 #include <keyboard/Key.h>
+#include <fstream>
+
 
 mavros_msgs::State current_state;
 void state_cb(const mavros_msgs::State::ConstPtr& msg){
@@ -15,10 +17,28 @@ void state_cb(const mavros_msgs::State::ConstPtr& msg){
 class attitudeControl
 {
     public:
-        attitudeControl()
+
+        attitudeControl(char* name)
         {
             thrust=0;
             resolution=0.025;
+            file.open(name);
+
+            if( file.is_open())
+            {
+                getSequenceFromFile();
+            }
+
+            else
+            {
+                ROS_INFO("ERROR opening sequence file";)
+            }
+
+        }
+
+        ~attitudeControl()
+        {
+            file.close();
         }
     void updateThrust(const keyboard::Key::ConstPtr& key)
     {   
@@ -36,6 +56,20 @@ class attitudeControl
         
     }
 
+
+    void getSequenceFromFile()
+    {
+        string line;
+        string::iterator it;
+
+        while(getline (file,line)) //simply reading the file for now
+        {                           //need to process sequence
+            cout<<line<<'\n';
+            
+        }
+
+    }
+
     double getthrust()
     {
         return thrust;
@@ -45,6 +79,10 @@ class attitudeControl
     private:
         double thrust;
         float resolution;
+        void std::vector<int,int> sequence; //vector that stores x,y of the sequence
+        ifstream file;
+
+    
         
 
 };
