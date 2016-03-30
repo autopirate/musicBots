@@ -15,6 +15,13 @@ void state_cb(const mavros_msgs::State::ConstPtr& msg){
     current_state = *msg;
 }
 
+typedef struct 
+        {
+            double midi_;
+            double time_;
+        } music_command_type;
+
+
 class attitudeControl
 {
     public:
@@ -26,6 +33,7 @@ class attitudeControl
             file.open(name.c_str());
             index_in_sequence = 0;
             started = false;
+            manualControl=true;
 
             if( file.is_open() )
             {
@@ -46,14 +54,28 @@ class attitudeControl
     
         void updateThrust(const keyboard::Key::ConstPtr& key)
         {   
-            if (key->code==273)
-                this->thrust+=resolution;
-            else if (key->code==274)
-                this->thrust-=resolution;
+            if (key->code==112)
+                this->manualControl=false;
+            else if (key->code==109)
+                this->manualControl=true;
             else if (key->code==27)
                 this->arm=false;
             else if (key->code==97)
                 this->arm=true;
+            
+            if (manualControl && this->arm)
+            {
+                if (key->code==273)
+                    this->thrust+=resolution;
+                else if (key->code==274)
+                    this->thrust-=resolution;
+            }
+
+            else if (!manualControl && this->arm)
+            {
+                play_music();
+            }
+
 
             ROS_INFO(" Thrust Value : %f\n",this->thrust);
         //ROS_INFO("Resolution : %f \n", this->resolution);
@@ -64,13 +86,14 @@ class attitudeControl
         {
             double midi_read;
             double time_read;
+            music_command_type input_cmd;
+                
 
             while(file >> midi_read >> time_read) //simply reading the file for now
             {                           //need to process sequence
                 // double midi_d = std::stod(midi_read);
                 // double time_d = std::stod(time_read);
                 std::cout << midi_read << " " << time_read << std::endl;
-                music_command_type input_cmd;
                 input_cmd.midi_ = midi_read;
                 input_cmd.time_ = time_read;
                 sequence.push_back(input_cmd);
@@ -80,31 +103,24 @@ class attitudeControl
 
         double getthrust()
         {
-            this->updateThrust_music();
             return thrust;
         }
         bool arm;
     private:
         double thrust;
         float resolution;
-
-        //required for music
-        typedef struct 
-        {
-            double midi_;
-            double time_;
-        } music_command_type;
-
+        
         std::vector<music_command_type> sequence; //vector that stores x,y of the sequence
         std::ifstream file;
         int index_in_sequence;
         std::clock_t start_time, end_time;
         bool started;
+        bool manualControl;
 
         /*
          * Private function to update the thrust depending on time and music file read
          */
-        void updateThrust_music()
+        void play_music()
         {
             if(!started)
             {
@@ -124,6 +140,13 @@ class attitudeControl
                 thrust = calc_thrust_fromMIDI(sequence[index_in_sequence].midi_); //update thrust
                 time(&start_time); //start timer
                 return;
+            }
+
+            else if (index_in_sequence==sequence.size())
+            {
+                started=false;
+                thrust= 0;
+                manualControl=true;
             }
         }
 

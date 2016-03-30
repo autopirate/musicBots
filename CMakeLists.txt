@@ -132,7 +132,8 @@ include_directories(
 # add_executable(mav_test_node_node src/mav_test_node_node.cpp)
 
 #add_executable(mav_test src/testNode_mav.cpp)
-add_executable(mav_test src/testNode_mav_keyboardCtrl.cpp)
+#add_executable(mav_test src/testNode_mav_keyboardCtrl.cpp)
+add_executable(mav_test src/musicBots.cpp)
 
 
 target_link_libraries(mav_test ${catkin_LIBRARIES})
