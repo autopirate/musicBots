@@ -7,6 +7,7 @@
 #include <mavros_msgs/AttitudeTarget.h>
 #include <keyboard/Key.h>
 #include <fstream>
+#include <string>
 
 
 mavros_msgs::State current_state;
@@ -18,20 +19,22 @@ class attitudeControl
 {
     public:
 
-        attitudeControl(char* name)
+        attitudeControl(std::string name)
         {
             thrust=0;
             resolution=0.025;
-            file.open(name);
+            file.open(name.c_str());
+            index_in_sequence = 0;
+            started = false;
 
-            if( file.is_open())
+            if( file.is_open() )
             {
                 getSequenceFromFile();
             }
 
             else
             {
-                ROS_INFO("ERROR opening sequence file";)
+                ROS_INFO("ERROR opening sequence file");
             }
 
         }
@@ -40,57 +43,105 @@ class attitudeControl
         {
             file.close();
         }
-    void updateThrust(const keyboard::Key::ConstPtr& key)
-    {   
-        if (key->code==273)
-            this->thrust+=resolution;
-        else if (key->code==274)
-            this->thrust-=resolution;
-        else if (key->code==27)
-            this->arm=false;
-        else if (key->code==97)
-            this->arm=true;
+    
+        void updateThrust(const keyboard::Key::ConstPtr& key)
+        {   
+            if (key->code==273)
+                this->thrust+=resolution;
+            else if (key->code==274)
+                this->thrust-=resolution;
+            else if (key->code==27)
+                this->arm=false;
+            else if (key->code==97)
+                this->arm=true;
 
-        ROS_INFO(" Thrust Value : %f\n",this->thrust);
+            ROS_INFO(" Thrust Value : %f\n",this->thrust);
         //ROS_INFO("Resolution : %f \n", this->resolution);
         
-    }
-
-
-    void getSequenceFromFile()
-    {
-        string line;
-        string::iterator it;
-
-        while(getline (file,line)) //simply reading the file for now
-        {                           //need to process sequence
-            cout<<line<<'\n';
-            
         }
 
-    }
+        void getSequenceFromFile()
+        {
+            double midi_read;
+            double time_read;
 
-    double getthrust()
-    {
-        return thrust;
-    }
+            while(file >> midi_read >> time_read) //simply reading the file for now
+            {                           //need to process sequence
+                // double midi_d = std::stod(midi_read);
+                // double time_d = std::stod(time_read);
+                std::cout << midi_read << " " << time_read << std::endl;
+                music_command_type input_cmd;
+                input_cmd.midi_ = midi_read;
+                input_cmd.time_ = time_read;
+                sequence.push_back(input_cmd);
+            }
 
-    bool arm;
+        }
+
+        double getthrust()
+        {
+            this->updateThrust_music();
+            return thrust;
+        }
+        bool arm;
     private:
         double thrust;
         float resolution;
-        void std::vector<int,int> sequence; //vector that stores x,y of the sequence
-        ifstream file;
 
-    
-        
+        //required for music
+        typedef struct 
+        {
+            double midi_;
+            double time_;
+        } music_command_type;
 
+        std::vector<music_command_type> sequence; //vector that stores x,y of the sequence
+        std::ifstream file;
+        int index_in_sequence;
+        std::clock_t start_time, end_time;
+        bool started;
+
+        /*
+         * Private function to update the thrust depending on time and music file read
+         */
+        void updateThrust_music()
+        {
+            if(!started)
+            {
+                index_in_sequence = 0;
+                started = true;
+                thrust = calc_thrust_fromMIDI(sequence[index_in_sequence].midi_); //set thrust
+                time(&start_time); //start timer
+                return;
+            }
+
+            time(&end_time);
+            double elapsed_time = difftime(end_time, start_time);
+            if( elapsed_time >= sequence[index_in_sequence].time_ 
+                        && index_in_sequence < sequence.size() )
+            {
+                index_in_sequence++;
+                thrust = calc_thrust_fromMIDI(sequence[index_in_sequence].midi_); //update thrust
+                time(&start_time); //start timer
+                return;
+            }
+        }
+
+        double calc_thrust_fromMIDI(double MIDI)
+        {
+            //TODO
+            double thrust_ = 0.0;
+            double m = 0.05743;
+            double b = -2.752;
+            thrust_ = m*MIDI + b;
+            return thrust_;
+        }
 };
 
 
 int main(int argc, char **argv)
 {   
-    attitudeControl attSet;
+    attitudeControl attSet("test.txt");
 
     ros::init(argc, argv, "mav_test");
     ros::NodeHandle nh;
