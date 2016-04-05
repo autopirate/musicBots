@@ -78,6 +78,17 @@ class attitudeControl
 
         void run()
         {
+
+            setOffBoard();
+            
+            this->setLastRequestTime();
+
+            this->publish_Thrust();
+        }
+        
+        void setOffBoard()
+        {
+
             if( this->get_CurState().mode != "OFFBOARD" &&
                 (ros::Time::now() - this->getLastRequestTime() > ros::Duration(5.0)))
             {
@@ -87,34 +98,34 @@ class attitudeControl
                     ROS_INFO("Offboard enabled");
                 }
             } 
+        }
 
-            else if (!this->getArm() && 
-                (ros::Time::now() - this->getLastRequestTime() > ros::Duration(5.0)))
-            {
-                if( this->arming_client.call(this->disarm_cmd) &&
-                        this->disarm_cmd.response.success)
-                {
-                    ROS_INFO("Vehicle disarmed");
-                }
-            }
-
-            else 
-            {
-                if( !this->get_CurState().armed && this->getArm() && 
-                    (ros::Time::now() - this->getLastRequestTime() > ros::Duration(5.0))){
-                    if( this->arming_client.call(this->arm_cmd) &&
-                        this->arm_cmd.response.success)
+        void arm_cb()
+        {
+          
+                    if( this->arming_client.call(this->arm_cmd) && this->arm_cmd.response.success)
                     {
                         ROS_INFO("Vehicle armed");
                     }
-                    
-                }
-            }
-            this->setLastRequestTime();
-
-            this->publish_Thrust();
-        }
+                    else
+                    {
+                        ROS_INFO("Arming Failed");
+                    }                    
+          
     
+        }
+
+        void disarm_cb()
+        {
+                if( this->arming_client.call(this->disarm_cmd) && this->disarm_cmd.response.success)
+                {
+                    ROS_INFO("Vehicle disarmed");
+                }
+                else
+                {
+                    ROS_INFO("disarming Failed");
+                }  
+        }
     private:
         //Variables
         double thrust;
@@ -195,8 +206,10 @@ class attitudeControl
 
         //Callbacks
         void state_cb(const mavros_msgs::State::ConstPtr& msg){
-            std::cout << "State Read" << std::endl;
+           // std::cout << "State Read" << std::endl;
+            
             this->current_state = *msg;
+            std::cout<<"Thrust: "<<this->thrust<<std::endl;
         }
 
         void updateThrust_cb(const keyboard::Key::ConstPtr& key)
@@ -214,11 +227,14 @@ class attitudeControl
             {    
                 this->thrust=0;
                 this->arm=false;
+                disarm_cb();
             }
             
             else if (key->code==97)
-                this->arm=true;
-            
+            {   this->arm=true;
+                arm_cb();
+            }
+
             if (manualControl && this->arm)
             {
                 if (key->code==273)
@@ -267,29 +283,34 @@ class attitudeControl
                 index_in_sequence = 0;
                 started = true;
                 this->thrust = calc_thrust_fromMIDI(sequence[index_in_sequence].midi_); //set thrust
+                this->publish_Thrust();
                 ROS_INFO(" Thrust Value : %f\n",this->thrust);
                 time(&start_time); //start timer
             }
 
             
-            while ( started && index_in_sequence<=sequence.size())
+            while ( started && index_in_sequence<sequence.size())
             {   
                 time(&end_time);
                 elapsed_time = difftime(end_time, start_time);
-                
-                if( elapsed_time >= sequence[index_in_sequence].time_)
+                this->publish_Thrust();
+                if( elapsed_time >= sequence[index_in_sequence].time_ && index_in_sequence!=sequence.size())
                 {   
-                    this->thrust = calc_thrust_fromMIDI(sequence[index_in_sequence].midi_); //update thrust
-                    ROS_INFO(" Thrust Value : %f\n",this->thrust);
                     index_in_sequence++;
+                    this->thrust = calc_thrust_fromMIDI(sequence[index_in_sequence].midi_); //update thrust
+                    
+                    ROS_INFO(" Thrust Value : %f\n",this->thrust); 
                     time(&start_time);
-                    time(&end_time);                   
+                    time(&end_time);  
+                                   
                 }
 
             }
 
             manualControl=true;
             this->thrust=min_thrust;
+            started=false;
+            setOffBoard();
         }
 
         double calc_thrust_fromMIDI(double MIDI)
