@@ -6,7 +6,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "mav_test");
     ros::NodeHandle nh;
 
-    attitudeControl attSet("/home/shivam/catkin_ws/src/mav_test/src/test.txt", nh);
+    attitudeControl attSet("/home/shivam/catkin_ws/src/mav_test/src/sequence.txt", nh);
     //the setpoint publishing rate MUST be faster than 2Hz
     ros::Rate rate(20.0);
 

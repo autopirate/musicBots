@@ -78,26 +78,25 @@ class attitudeControl
 
         void run()
         {
-
+            this->publish_Thrust();
             setOffBoard();
             
             this->setLastRequestTime();
 
-            this->publish_Thrust();
+            
         }
         
         void setOffBoard()
         {
 
-            if( this->get_CurState().mode != "OFFBOARD" &&
-                (ros::Time::now() - this->getLastRequestTime() > ros::Duration(5.0)))
-            {
-                if( this->set_mode_client.call(this->offb_set_mode) &&
-                    this->offb_set_mode.response.success)
-                {
-                    ROS_INFO("Offboard enabled");
-                }
-            } 
+            if( current_state.mode != "OFFBOARD" &&
+            (ros::Time::now() - last_request > ros::Duration(5.0))){
+            if( set_mode_client.call(offb_set_mode) &&
+                offb_set_mode.response.success){
+                ROS_INFO("Offboard enabled");
+            }
+            last_request = ros::Time::now();
+        }
         }
 
         void arm_cb()
@@ -173,7 +172,7 @@ class attitudeControl
         void init_publishers(ros::NodeHandle nh)
         {
             this->local_att_pub = nh.advertise<mavros_msgs::AttitudeTarget>
-                ("mavros/setpoint_raw/attitude", 10);
+                ("mavros/setpoint_raw/attitude", 1);
         }
 
         //Service Clients
